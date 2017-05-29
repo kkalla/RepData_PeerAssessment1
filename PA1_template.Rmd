@@ -7,15 +7,88 @@ output:
 
 
 ## Loading and preprocessing the data
+##Requirements
+I use these packages. Install packages if you don't have these.
+```{r results='hide'}
+library(dplyr)
+library(ggplot2)
+library(grid)
+library(RColorBrewer)
+```
+###Donwloading and loading data
+In this step, I download the data from [here]("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip") and store it in data directory under current working directory(Check your working directory before download). And unzip it and load to data frame named activity.
+```{r echo=TRUE}
+if(!dir.exists("./data")){
+    dir.create("./data")
+}
 
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+if(!file.exists("./data/pa1zip.zip")){
+    file.create("./data/pa1zip.zip")
+}
+download.file(fileUrl, "./data/pa1zip.zip")
+unzip("./data/pa1zip.zip",exdir = "./data")
+activity <- read.csv("./data/activity.csv")
+```
+The variables included in this dataset are:  
+-**steps**: Number of steps taking in a 5-minute interval (missing values are coded as NA)  
+-**date**: The date on which the measurement was taken in YYYY-MM-DD format  
+-**interval**: Identifier for the 5-minute interval in which measurement was taken.
+Let's see this dataset briefly(first 6 and last 6 rows).
+```{r}
+str(activity)
+head(activity)
+tail(activity)
+```
+As you can see, there are NAs in variable *steps*. And variable *date* is loaded as factor not date. Now let's check how many NAs there are in *steps*.
 
+```{r}
+sum<-sum(is.na(activity$steps))
+sum
+sum/length(activity$steps)
+```
+There are `r sum` NAs in the *steps* and it is about `r 100*sum/length(activity$steps)`% of rows. For further analysis I make data.frame **complete_activity** by removing NAs of *steps*.
+```{r}
+complete_activity <- activity[complete.cases(activity$steps),]
+```
 
 ## What is mean total number of steps taken per day?
+I make histogram of the total number of steps taken each day.  
+```{r}
+total_steps <- select(activity,steps,date) %>% group_by(date)%>% summarise(steps = sum(steps,na.rm = TRUE))
+mean_steps <- mean(total_steps$steps)
+median_steps <- median(total_steps$steps)
+cols <- brewer.pal(3,'Dark2')
+mean_string<-paste("mean =",round(mean_steps,2))
+median_string<-paste("median =",round(median_steps,2))
 
+g <- ggplot(total_steps,aes(steps))
+g + geom_histogram(binwidth = 800) + 
+    labs(title = 'The Total Number of Steps\nTaken Each Day', 
+         x = 'The total number of steps') + 
+    geom_vline(xintercept = mean_steps,lwd = 2,col = cols[1]) +
+    geom_vline(xintercept = median_steps,lwd = 2,col = cols[2]) +
+    annotate("text",x=5000,y=9.0,label = mean_string,col = cols[1],size = 4) +
+    annotate("text",x=5000,y=7.5,label = median_string,col = cols[2],size = 4)+
+    theme(plot.title = element_text(size = 28,lineheight=.8,vjust=3))
+```
+
+In this histogram, the mean total number of steps taken per day is `r mean_steps`. And a number of days that the total number of steps is less than 800 is 10. It is same as a number of days of walking 10000-10800 steps in a day.
 
 
 ## What is the average daily activity pattern?
-
+I make a time series plot of the 5-minute interal and the average number of steps taken, averaged across all days.
+```{r}
+steps_pattern <- group_by(complete_activity,interval)%>%summarise(steps = mean(steps))
+max_interval<-steps_pattern[steps_pattern$steps==max(steps_pattern$steps),1]
+maxg1 <- ggplot(steps_pattern,aes(interval,steps))
+g1 + geom_line(aes(interval,steps)) + labs(title = 'The average number of steps of the 5-minute interval',
+                                           subtitle = 'averaged across all days', x = '5-minute interval',
+                                           y = 'Average number of steps') +
+    geom_point(aes(max_interval,max(steps_pattern$steps)),lwd=3,col = cols[3])+
+    annotate("text",x=500,y=max(steps_pattern$steps),
+             label = paste("maximum=",round(max(steps_pattern$steps),3)))
+```
 
 
 ## Imputing missing values
